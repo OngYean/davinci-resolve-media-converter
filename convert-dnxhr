@@ -1,0 +1,94 @@
+#!/bin/bash
+# Usage: ./convert-dnxhr input1.mov input2.mov ...
+# Or:    ./convert-dnxhr *.mov
+
+# Exit if no argument is given
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <input_file(s)>"
+    echo "Example: $0 video.mov"
+    echo "Example: $0 video1.mov video2.mov video3.mov"
+    echo "Example: $0 *.mov"
+    exit 1
+fi
+
+# Check if ffmpeg is installed
+if ! command -v ffmpeg &> /dev/null; then
+    echo "Error: ffmpeg is not installed. Please install it first."
+    exit 1
+fi
+
+# Initialize counters
+total_files=$#
+current_file=0
+successful=0
+failed=0
+skipped=0
+
+echo "========================================"
+echo "Batch DNxHR Conversion"
+echo "Total files to process: $total_files"
+echo "========================================"
+echo
+
+# Process each input file
+for input in "$@"; do
+    ((current_file++))
+    
+    echo "----------------------------------------"
+    echo "Processing file $current_file of $total_files: $input"
+    echo "----------------------------------------"
+    
+    # Check if input file exists
+    if [ ! -f "$input" ]; then
+        echo "Warning: Input file '$input' does not exist - skipping"
+        ((skipped++))
+        echo
+        continue
+    fi
+    
+    base="${input%.*}"                 # remove file extension
+    output="${base}_converted.mov"     # new filename
+    
+    # Check if output file already exists
+    if [ -f "$output" ]; then
+        echo "Warning: Output file '$output' already exists - skipping"
+        echo "(Delete or rename the existing file to convert again)"
+        ((skipped++))
+        echo
+        continue
+    fi
+    
+    echo "Converting to DNxHR HQ..."
+    echo "Output: $output"
+    echo
+    
+    # Run ffmpeg with proper DNxHR encoding
+    ffmpeg -progress pipe:1 -i "$input" -c:v dnxhd -profile:v dnxhr_hq -pix_fmt yuv422p -c:a pcm_s16le "$output"
+    
+    # Check if conversion was successful
+    if [ $? -eq 0 ]; then
+        echo
+        echo "[SUCCESS] Conversion completed successfully!"
+        ((successful++))
+    else
+        echo
+        echo "[ERROR] Conversion failed"
+        ((failed++))
+    fi
+    echo
+done
+
+# Print summary
+echo "========================================"
+echo "Batch Conversion Summary"
+echo "========================================"
+echo "Total files: $total_files"
+echo "Successful:  $successful"
+echo "Failed:      $failed"
+echo "Skipped:     $skipped"
+echo "========================================"
+
+# Exit with error if any conversions failed
+if [ $failed -gt 0 ]; then
+    exit 1
+fi
